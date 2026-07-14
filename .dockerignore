@@ -1,0 +1,11 @@
+venv/
+frontend/
+nginx/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+scans.db
+*.db
+.env
+demo_light_scan.py

@@ -1,0 +1,86 @@
+# SecureQA Sentinel — one-command deploy for ZAP + Flask backend + React frontend.
+#
+# Deliberately NOT included here (see handoff_v5.md rationale):
+#   - Ollama: stays a manually-run host process, reached via host.docker.internal.
+#     RAM is already the project's tightest constraint; adding a 4th compose
+#     service for a large local model would make that worse for no real benefit
+#     (Groq already covers the "fast" path). Groq's API key is picked up from
+#     the GROQ_API_KEY env var on your machine — same as your normal local setup.
+#   - csp-proxy (nginx): this exists purely to manufacture the before/after demo
+#     scenario for the comparison feature, not as a real deployment component.
+#     Keep starting it manually with `docker start csp-proxy` when you need the
+#     demo pair — see handoff_v5.md's "HOW TO START A SESSION" section.
+#   - Juice Shop: it's a scan TARGET, not part of the app's own stack. Point
+#     the scanner at whatever target you like (host.docker.internal:3000 for
+#     local Juice Shop, or anything else).
+#
+# Run with:  docker compose up --build
+# Stop with: docker compose down
+
+services:
+  zap:
+    image: zaproxy/zap-stable
+    container_name: sentinel-zap
+    command: >
+      zap.sh -daemon -host 0.0.0.0 -port 8080
+      -config api.disablekey=true
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      # ZAP is the one actually making outbound requests to scan targets
+      # (like Juice Shop), so IT needs the host bridge, not just the backend.
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sentinel-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinel-backend
+    depends_on:
+      - zap
+    environment:
+      # Inside the compose network, backend reaches ZAP by service name.
+      ZAP_API_URL: http://zap:8080
+      # Ollama stays outside compose — reached via the host bridge, same
+      # pattern as ZAP -> Juice Shop today.
+      OLLAMA_URL: http://host.docker.internal:11434
+      # Pulled from your host shell env (set via `setx GROQ_API_KEY "..."`
+      # on Windows — open a NEW terminal after setting it, same PATH-refresh
+      # quirk as Ollama).
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "5000:5000"
+    volumes:
+      # Bind-mounts your existing scans.db so data persists across container
+      # rebuilds and survives `docker compose down`. ASSUMPTION: database.py
+      # points at ./scans.db relative to the project root — adjust the left
+      # side of this mapping if it actually lives elsewhere.
+      - ./scans.db:/app/scans.db
+    networks:
+      - sentinel-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Must be the host-mapped port — this is what the BROWSER calls,
+        # not what other containers call.
+        VITE_API_URL: http://localhost:5000
+    container_name: sentinel-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+    networks:
+      - sentinel-net
+
+networks:
+  sentinel-net:
+    driver: bridge
