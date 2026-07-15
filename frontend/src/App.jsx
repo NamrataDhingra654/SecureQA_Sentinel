@@ -29,6 +29,17 @@ function computeProgress(phase, percent) {
   if (phase === "active_scan") return Math.min(95, 48 + pct * 0.47)
   return 50 // "unknown" phase — transient read failure on the backend, hold steady
 }
+function CustomTooltip({ active, payload }) {
+  if (active && payload?.length) {
+    return (
+      <div style={{ background: "#13131a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px" }}>
+        <p style={{ color: payload[0].payload.color || "#fff", fontSize: 13, fontWeight: 600 }}>{payload[0].name}</p>
+        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>{payload[0].value} findings</p>
+      </div>
+    )
+  }
+  return null
+}
 
 export default function App() {
   const [url, setUrl]             = useState("")
@@ -83,8 +94,13 @@ export default function App() {
   const tableRef = useRef(null)
   const pollTimerRef = useRef(null)
 
-  // Reset filter/page/report on new scan load
-  useEffect(() => {
+  // Reset filter/page/report on new scan load.
+  // Pattern: detect the change during render and adjust state immediately,
+  // rather than in a useEffect — avoids an extra render pass and matches
+  // React's documented guidance for "resetting state when a prop changes."
+  const [prevScanId, setPrevScanId] = useState(scan?.id)
+  if (scan?.id !== prevScanId) {
+    setPrevScanId(scan?.id)
     setFilterSeverity("All")
     setSearchQuery("")
     setPage(1)
@@ -93,15 +109,17 @@ export default function App() {
     setChatMessages([])
     setChatError(null)
     setPdfError(null)
-  }, [scan?.id])
+  }
 
   // Reset the displayed report when switching Local/Cloud — each backend has
   // its own independent cache now, so the old backend's text should never
-  // linger on screen labeled under the new toggle
-  useEffect(() => {
+  // linger on screen labeled under the new toggle. Same render-time pattern.
+  const [prevBackendChoice, setPrevBackendChoice] = useState(backendChoice)
+  if (backendChoice !== prevBackendChoice) {
+    setPrevBackendChoice(backendChoice)
     setReport(null)
     setReportError(null)
-  }, [backendChoice])
+  }
 
   // Fetch history on mount
   useEffect(() => {
@@ -424,18 +442,6 @@ export default function App() {
   const riskScore      = scan ? Math.min(10, Math.round((scan.high * 4 + scan.medium * 1.5 + scan.low * 0.5) / 60)) : 0
   const riskLabel      = riskScore >= 7 ? "Critical" : riskScore >= 4 ? "Moderate" : "Low Risk"
   const riskScoreColor = riskScore >= 7 ? "#f87171" : riskScore >= 4 ? "#fbbf24" : "#34d399"
-
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload?.length) {
-      return (
-        <div style={{ background: "#13131a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px" }}>
-          <p style={{ color: payload[0].payload.color || "#fff", fontSize: 13, fontWeight: 600 }}>{payload[0].name}</p>
-          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>{payload[0].value} findings</p>
-        </div>
-      )
-    }
-    return null
-  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d14", color: "#fff", fontFamily: "'Inter', system-ui, sans-serif" }}>
