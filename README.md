@@ -243,7 +243,3 @@ These are documented deliberately, not accidental gaps — a self-hosted student
 - [ ] Authentication layer (deliberately out of scope for this project — see [Known limitations](#known-limitations))
 
 ---
-
-## License
-
-*(Add your chosen license here — e.g. MIT, Apache 2.0 — or note that this is an academic project not intended for production use.)*
