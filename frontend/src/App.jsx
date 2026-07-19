@@ -29,7 +29,9 @@ function computeProgress(phase, percent) {
   if (phase === "active_scan") return Math.min(95, 48 + pct * 0.47)
   return 50 // "unknown" phase — transient read failure on the backend, hold steady
 }
-function CustomTooltip({ active, payload }) {
+
+// CustomTooltip moved outside the component to avoid recreation on each render
+const CustomTooltip = ({ active, payload }) => {
   if (active && payload?.length) {
     return (
       <div style={{ background: "#13131a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px" }}>
@@ -94,13 +96,8 @@ export default function App() {
   const tableRef = useRef(null)
   const pollTimerRef = useRef(null)
 
-  // Reset filter/page/report on new scan load.
-  // Pattern: detect the change during render and adjust state immediately,
-  // rather than in a useEffect — avoids an extra render pass and matches
-  // React's documented guidance for "resetting state when a prop changes."
-  const [prevScanId, setPrevScanId] = useState(scan?.id)
-  if (scan?.id !== prevScanId) {
-    setPrevScanId(scan?.id)
+  // Reset filter/page/report on new scan load
+  useEffect(() => {
     setFilterSeverity("All")
     setSearchQuery("")
     setPage(1)
@@ -109,17 +106,15 @@ export default function App() {
     setChatMessages([])
     setChatError(null)
     setPdfError(null)
-  }
+  }, [scan?.id])
 
   // Reset the displayed report when switching Local/Cloud — each backend has
   // its own independent cache now, so the old backend's text should never
-  // linger on screen labeled under the new toggle. Same render-time pattern.
-  const [prevBackendChoice, setPrevBackendChoice] = useState(backendChoice)
-  if (backendChoice !== prevBackendChoice) {
-    setPrevBackendChoice(backendChoice)
+  // linger on screen labeled under the new toggle
+  useEffect(() => {
     setReport(null)
     setReportError(null)
-  }
+  }, [backendChoice])
 
   // Fetch history on mount
   useEffect(() => {
@@ -486,7 +481,7 @@ export default function App() {
             </button>
 
             {auditOpen && auditResult && !auditLoading && (
-              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, background: "#13131a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, minWidth: 300, padding: 16, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, background: "#13131a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, minWidth: 300, padding: "16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   {auditResult.valid
                     ? <ShieldCheck size={16} color="#34d399" />
@@ -547,7 +542,7 @@ export default function App() {
               <select
                 value={compareA}
                 onChange={e => setCompareA(e.target.value)}
-                style={{ flex: 1, minWidth: 200, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 12px", fontSize: 13, color: "#fff", outline: "none" }}
+                style={{ flex: 1, minWidth: 200, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 12px", fontSize: 13, color: "#fff" }}
               >
                 <option value="" style={{ background: "#13131a" }}>Scan A (before)…</option>
                 {pastScans.map(s => (
@@ -562,7 +557,7 @@ export default function App() {
               <select
                 value={compareB}
                 onChange={e => setCompareB(e.target.value)}
-                style={{ flex: 1, minWidth: 200, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 12px", fontSize: 13, color: "#fff", outline: "none" }}
+                style={{ flex: 1, minWidth: 200, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 12px", fontSize: 13, color: "#fff" }}
               >
                 <option value="" style={{ background: "#13131a" }}>Scan B (after)…</option>
                 {pastScans.map(s => (
@@ -595,7 +590,7 @@ export default function App() {
             )}
 
             {compareError && (
-              <div style={{ margin: "0 20px 16px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ margin: "0 20px 16px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} color="#f87171" />
                 <span style={{ fontSize: 12, color: "#f87171" }}>{compareError}</span>
               </div>
@@ -627,7 +622,7 @@ export default function App() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171" }}>New</span>
                   </div>
                   {compareResult.new.length === 0 ? (
-                    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
+                    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "rgba(255,255,255,0.2)" }}>
                       Nothing new between these scans.
                     </div>
                   ) : (
@@ -635,7 +630,7 @@ export default function App() {
                       {compareResult.new.map((f, i) => {
                         const rc = getRiskConfig(f.severity)
                         return (
-                          <div key={`${f.name}-${f.cwe}-${i}`} style={{ padding: "10px 14px", borderBottom: i < compareResult.new.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                          <div key={`${f.name}-${f.cwe}-${i}`} style={{ padding: "10px 14px", borderBottom: i < compareResult.new.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 10 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>{f.name}</div>
                               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{f.cwe || "No CWE"} · {f.instance_count} instance{f.instance_count === 1 ? "" : "s"}</div>
@@ -657,7 +652,7 @@ export default function App() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#34d399" }}>Resolved</span>
                   </div>
                   {compareResult.resolved.length === 0 ? (
-                    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
+                    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "rgba(255,255,255,0.2)" }}>
                       Nothing resolved between these scans.
                     </div>
                   ) : (
@@ -665,7 +660,7 @@ export default function App() {
                       {compareResult.resolved.map((f, i) => {
                         const rc = getRiskConfig(f.severity)
                         return (
-                          <div key={`${f.name}-${f.cwe}-${i}`} style={{ padding: "10px 14px", borderBottom: i < compareResult.resolved.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                          <div key={`${f.name}-${f.cwe}-${i}`} style={{ padding: "10px 14px", borderBottom: i < compareResult.resolved.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 10 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>{f.name}</div>
                               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{f.cwe || "No CWE"} · {f.instance_count} instance{f.instance_count === 1 ? "" : "s"}</div>
@@ -687,7 +682,7 @@ export default function App() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Persistent</span>
                   </div>
                   {compareResult.persistent.length === 0 ? (
-                    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
+                    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "rgba(255,255,255,0.2)" }}>
                       No shared findings between these scans.
                     </div>
                   ) : (
@@ -696,7 +691,7 @@ export default function App() {
                         const rcA = getRiskConfig(f.severity_a)
                         const rcB = getRiskConfig(f.severity_b)
                         return (
-                          <div key={`${f.name}-${f.cwe}-${i}`} style={{ padding: "10px 14px", borderBottom: i < compareResult.persistent.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                          <div key={`${f.name}-${f.cwe}-${i}`} style={{ padding: "10px 14px", borderBottom: i < compareResult.persistent.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 10 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>{f.name}</div>
                               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{f.cwe || "No CWE"} · {f.instance_count_a} → {f.instance_count_b} instances</div>
@@ -743,7 +738,7 @@ export default function App() {
             <button
               onClick={() => setDropdownOpen(o => !o)}
               disabled={loadingList || scanning}
-              style={{ height: "100%", padding: "0 16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 13, color: "rgba(255,255,255,0.6)", cursor: loadingList || scanning ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", opacity: loadingList ? 0.4 : 1 }}
+              style={{ height: "100%", padding: "0 16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 13, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 6, cursor: loadingList || scanning ? "not-allowed" : "pointer" }}
             >
               <History size={13} />
               {loadingList ? "Loading…" : `Past scans${pastScans.length ? ` (${pastScans.length})` : ""}`}
@@ -751,7 +746,7 @@ export default function App() {
             </button>
 
             {dropdownOpen && (
-              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, background: "#13131a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, minWidth: 340, maxHeight: 320, overflowY: "auto", boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, background: "#13131a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, minWidth: 340, maxHeight: 400, overflowY: "auto" }}>
                 <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Scan history</span>
                 </div>
@@ -765,7 +760,7 @@ export default function App() {
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                        <span style={{ fontSize: 10, color: "#34d399", fontWeight: 700, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 4, padding: "1px 6px", flexShrink: 0 }}>#{s.id}</span>
+                        <span style={{ fontSize: 10, color: "#34d399", fontWeight: 700, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 4, padding: "1px 6px" }}>#{s.id}</span>
                         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.target_url}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
@@ -785,7 +780,8 @@ export default function App() {
           {dropdownOpen && <div onClick={() => setDropdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />}
 
           <button onClick={handleScan} disabled={scanning || !url}
-            style={{ padding: "12px 24px", background: scanning ? "rgba(52,211,153,0.3)" : "#34d399", borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#000", border: "none", cursor: scanning ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, opacity: !url ? 0.4 : 1 }}>
+            style={{ padding: "12px 24px", background: scanning ? "rgba(52,211,153,0.3)" : "#34d399", borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#000", border: "none", cursor: scanning || !url ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8 }}
+          >
             <Zap size={14} />
             {scanning ? "Scanning…" : "Run Scan"}
           </button>
@@ -795,7 +791,7 @@ export default function App() {
           <div style={{ marginBottom: 20, background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "13px 18px", display: "flex", alignItems: "center", gap: 10 }}>
             <AlertCircle size={15} color="#f87171" />
             <span style={{ fontSize: 13, color: "#f87171" }}>{error}</span>
-            <button onClick={() => setError(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(248,113,113,0.5)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>x</button>
+            <button onClick={() => setError(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(248,113,113,0.5)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}><X size={18} /></button>
           </div>
         )}
 
@@ -863,12 +859,12 @@ export default function App() {
               <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "13px 18px", display: "flex", alignItems: "center", gap: 10 }}>
                 <AlertCircle size={15} color="#f87171" />
                 <span style={{ fontSize: 13, color: "#f87171" }}>{pdfError}</span>
-                <button onClick={() => setPdfError(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(248,113,113,0.5)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>x</button>
+                <button onClick={() => setPdfError(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(248,113,113,0.5)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}><X size={18} /></button>
               </div>
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr", gap: 16 }}>
-              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Risk Score</span>
                 <span style={{ fontSize: 52, fontWeight: 900, color: riskScoreColor, letterSpacing: "-0.04em", lineHeight: 1 }}>{riskScore}</span>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>out of 10</span>
@@ -980,7 +976,7 @@ export default function App() {
                       value={searchQuery}
                       onChange={e => applySearch(e.target.value)}
                       placeholder="Search findings…"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "5px 28px", fontSize: 12, color: "#fff", outline: "none", width: 180 }}
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "5px 28px", fontSize: 12, color: "#fff", outline: "none" }}
                     />
                     {searchQuery && (
                       <button onClick={() => applySearch("")}
@@ -1032,7 +1028,8 @@ export default function App() {
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <button onClick={() => { setPage(p => Math.max(1, p - 1)); tableRef.current?.scrollIntoView({ behavior: "smooth" }) }}
                       disabled={page === 1}
-                      style={{ padding: "4px 12px", borderRadius: 8, fontSize: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: page === 1 ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.6)", cursor: page === 1 ? "not-allowed" : "pointer" }}>
+                      style={{ padding: "4px 12px", borderRadius: 8, fontSize: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: page === 1 ? "rgba(255,255,255,0.2)" : "#fff", cursor: page === 1 ? "not-allowed" : "pointer" }}
+                    >
                       Prev
                     </button>
 
@@ -1043,7 +1040,8 @@ export default function App() {
                         n === "…"
                           ? <span key={`e${i}`} style={{ padding: "4px 4px", fontSize: 12, color: "rgba(255,255,255,0.2)" }}>…</span>
                           : <button key={n} onClick={() => { setPage(n); tableRef.current?.scrollIntoView({ behavior: "smooth" }) }}
-                              style={{ padding: "4px 10px", borderRadius: 8, fontSize: 12, background: page === n ? "#34d399" : "rgba(255,255,255,0.04)", border: `1px solid ${page === n ? "#34d399" : "rgba(255,255,255,0.08)"}`, color: page === n ? "#000" : "rgba(255,255,255,0.5)", fontWeight: page === n ? 700 : 400, cursor: "pointer" }}>
+                              style={{ padding: "4px 10px", borderRadius: 8, fontSize: 12, background: page === n ? "#34d399" : "rgba(255,255,255,0.04)", border: `1px solid ${page === n ? "#34d399" : "rgba(255,255,255,0.08)"}`, color: page === n ? "#000" : "#fff", cursor: "pointer" }}
+                            >
                               {n}
                             </button>
                       )
@@ -1051,7 +1049,8 @@ export default function App() {
 
                     <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); tableRef.current?.scrollIntoView({ behavior: "smooth" }) }}
                       disabled={page === totalPages}
-                      style={{ padding: "4px 12px", borderRadius: 8, fontSize: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: page === totalPages ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.6)", cursor: page === totalPages ? "not-allowed" : "pointer" }}>
+                      style={{ padding: "4px 12px", borderRadius: 8, fontSize: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: page === totalPages ? "rgba(255,255,255,0.2)" : "#fff", cursor: page === totalPages ? "not-allowed" : "pointer" }}
+                    >
                       Next
                     </button>
                   </div>
@@ -1110,7 +1109,7 @@ export default function App() {
                   }}
                 >
                   {reportLoading
-                    ? <><div style={{ width: 11, height: 11, borderRadius: "50%", border: "2px solid rgba(52,211,153,0.3)", borderTopColor: "#34d399", animation: "spin 0.8s linear infinite" }} />Generating…</>
+                    ? <><div style={{ width: 11, height: 11, borderRadius: "50%", border: "2px solid rgba(52,211,153,0.3)", borderTopColor: "#34d399", animation: "spin 0.8s linear infinite" }} />Loading…</>
                     : report
                       ? <><RefreshCw size={12} />Regenerate</>
                       : <><FileText size={12} />Generate AI Report</>
@@ -1119,7 +1118,7 @@ export default function App() {
               </div>
 
               {reportError && (
-                <div style={{ margin: 16, background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ margin: 16, background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 8 }}>
                   <AlertCircle size={14} color="#f87171" />
                   <span style={{ fontSize: 12, color: "#f87171" }}>{reportError}</span>
                 </div>
@@ -1179,7 +1178,7 @@ export default function App() {
               </div>
 
               {/* Message list */}
-              <div ref={chatScrollRef} style={{ maxHeight: 320, minHeight: chatMessages.length ? 120 : 0, overflowY: "auto", padding: chatMessages.length ? "16px 20px" : 0, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div ref={chatScrollRef} style={{ maxHeight: 320, minHeight: chatMessages.length ? 120 : 0, overflowY: "auto", padding: chatMessages.length ? "16px 20px" : 0, display: "flex", flexDirection: "column", gap: 8 }}>
                 {chatMessages.length === 0 && !chatLoading && (
                   <div style={{ padding: "28px 20px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: 12 }}>
                     Ask a follow-up question, e.g. "Which finding should I fix first?"
@@ -1220,7 +1219,7 @@ export default function App() {
               </div>
 
               {chatError && (
-                <div style={{ margin: "0 16px 16px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ margin: "0 16px 16px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 8 }}>
                   <AlertCircle size={14} color="#f87171" />
                   <span style={{ fontSize: 12, color: "#f87171" }}>{chatError}</span>
                 </div>
