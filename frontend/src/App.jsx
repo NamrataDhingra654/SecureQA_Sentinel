@@ -96,8 +96,13 @@ export default function App() {
   const tableRef = useRef(null)
   const pollTimerRef = useRef(null)
 
-  // Reset filter/page/report on new scan load
-  useEffect(() => {
+  // Reset filter/page/report on new scan load.
+  // Pattern: detect the change during render and adjust state immediately,
+  // rather than in a useEffect — avoids an extra render pass and matches
+  // React's documented guidance for "resetting state when a prop changes."
+  const [prevScanId, setPrevScanId] = useState(scan?.id)
+  if (scan?.id !== prevScanId) {
+    setPrevScanId(scan?.id)
     setFilterSeverity("All")
     setSearchQuery("")
     setPage(1)
@@ -106,15 +111,17 @@ export default function App() {
     setChatMessages([])
     setChatError(null)
     setPdfError(null)
-  }, [scan?.id])
+  }
 
   // Reset the displayed report when switching Local/Cloud — each backend has
   // its own independent cache now, so the old backend's text should never
-  // linger on screen labeled under the new toggle
-  useEffect(() => {
+  // linger on screen labeled under the new toggle. Same render-time pattern.
+  const [prevBackendChoice, setPrevBackendChoice] = useState(backendChoice)
+  if (backendChoice !== prevBackendChoice) {
+    setPrevBackendChoice(backendChoice)
     setReport(null)
     setReportError(null)
-  }, [backendChoice])
+  }
 
   // Fetch history on mount
   useEffect(() => {
